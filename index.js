@@ -24,7 +24,6 @@ app.use(express.json())
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.0ez4m.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-
 const serviceInit = require('./management-app-21-firebase-adminsdk-ai3ju-fd6ffc5afa.json')
 
 async function verifyIdToken( req, res, next){
@@ -33,7 +32,7 @@ async function verifyIdToken( req, res, next){
     try{
       const decodedUser = await admin.auth().verifyIdToken(idToken);
       req.docodedEmail = decodedUser.email;
-      console.log( 'decoded email 37', req.docodedEmail)
+      // console.log( 'decoded email 37', req.docodedEmail)
     }
     catch{
       // console.log( 'from verify id token catch');
@@ -50,12 +49,28 @@ async function run (){
     const usres = database.collection("users");
 
     //adding customers ==================================
-    app.post("/usatomers", async (req, res) =>{
+    app.post("/customers", async (req, res) =>{
         const newCustomer = req.body;
         const result = await customers.insertOne(newCustomer);
         console.log( result )
         res.json(result);
     });
+
+    // get customers data ==========================================
+    app.get("/customers/:adminEmail/:CurrentUser", verifyIdToken, async (req, res) => {
+      const adminEmail = req.params.adminEmail;
+      const currentUser = req.params.CurrentUser;
+      console.log(req.headers.authorization)
+      console.log("get adminEmail",adminEmail, "currentUser", currentUser)
+      if(currentUser === req.docodedEmail){
+        const quary = {cusOf: adminEmail};
+        const result = await customers.find( quary ).toArray()
+        res.json(result)
+      }
+      else{
+        res.status(401).json({message: 'user not authorize'})
+      }
+    })
 
     //add user loged with gmail (upsert) ========================
     app.put("/users", async (req, res) =>{
@@ -67,11 +82,26 @@ async function run (){
       res.json( result );
     });
 
+    //get current user data ==================================
     app.get( '/users/:email', verifyIdToken, async( req, res) => {
       const email = req.params.email;
       console.log( 'decpded email', req.docodedEmail, 'params email', email)
       if( req.docodedEmail === email ){
         const quary = { email: email }
+        const result = await usres.findOne(quary)
+        res.json( result );
+      }
+      else{
+        res.status(401).json({message: 'user not authorize'})
+      }      
+    });
+
+    //get the propritor's data =====================
+    app.get( '/users/:email/:adminEmail', verifyIdToken, async( req, res) => {
+      const email = req.params.email;
+      const adminEmail = req.params.adminEmail;
+      if( req.docodedEmail === email ){
+        const quary = { email: adminEmail }
         const result = await usres.findOne(quary)
         res.json( result );
       }
@@ -91,14 +121,13 @@ async function run (){
     //   res.json( result );
     // });
 
+
     // add register user =======================================
     app.post("/users", async (req, res) =>{
       const newUser = req.body;
       const result = await usres.insertOne(newUser);
       res.json(result);
     })
-
-
   }
   finally{
     // await client.close();
